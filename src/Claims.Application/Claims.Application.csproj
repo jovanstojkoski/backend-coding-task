@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.1.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Class1.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="UseCases\Claims\Get\" />
+    <Folder Include="UseCases\Claims\Create\" />
+    <Folder Include="UseCases\Claims\Delete\" />
+    <Folder Include="UseCases\Covers\Create\" />
+    <Folder Include="UseCases\Covers\Delete\" />
+    <Folder Include="UseCases\Covers\Get\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Claims.Domain\Claims.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
