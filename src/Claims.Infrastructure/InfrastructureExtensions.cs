@@ -90,14 +90,13 @@ public static class InfrastructureExtensions
         string connectionString,
         string databaseName)
     {
-        services.AddDbContext<ClaimsContext>(options =>
-        {
-            var client = new MongoClient(connectionString);
-            var database = client.GetDatabase(databaseName);
+        services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
 
-            options.UseMongoDB(
-                database.Client,
-                database.DatabaseNamespace.DatabaseName);
+        services.AddDbContext<ClaimsContext>((serviceProvider, options) =>
+        {
+            var client = serviceProvider.GetRequiredService<IMongoClient>();
+
+            options.UseMongoDB(client, databaseName);
         });
 
         return services;
