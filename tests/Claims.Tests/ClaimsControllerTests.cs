@@ -54,6 +54,7 @@ namespace Claims.Tests
             var detailResponse = await client.GetAsync(
                 $"/Covers/{cover.Id}",
                 TestContext.Current.CancellationToken);
+
             var details = await detailResponse.Content.ReadFromJsonAsync<CreatedCoverResponse>(
                 TestContext.Current.CancellationToken);
 
@@ -88,6 +89,7 @@ namespace Claims.Tests
                     type = "Yacht"
                 },
                 TestContext.Current.CancellationToken);
+
             var cover = await coverResponse.Content.ReadFromJsonAsync<CreatedCoverResponse>(
                 TestContext.Current.CancellationToken);
 
@@ -117,6 +119,7 @@ namespace Claims.Tests
             var detailResponse = await client.GetAsync(
                 $"/Claims/{claim.Id}",
                 TestContext.Current.CancellationToken);
+
             var details = await detailResponse.Content.ReadFromJsonAsync<CreatedClaimResponse>(
                 TestContext.Current.CancellationToken);
 

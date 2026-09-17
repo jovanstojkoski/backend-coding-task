@@ -53,6 +53,7 @@ public sealed class CoverTests
     public void Create_RejectsPeriodsLongerThanOneYear()
     {
         var startDate = DateTime.UtcNow.Date.AddDays(1);
+
         var result = Cover.Create(
             startDate,
             startDate.AddYears(1).AddDays(1),

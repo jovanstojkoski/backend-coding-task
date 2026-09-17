@@ -48,7 +48,7 @@ internal sealed class CreateCoverUseCase(
 
         var auditResult = CoverAudit.Create(
             cover.Id,
-            "POST",
+            AuditHttpRequestTypes.Post,
             _dateTimeProvider.UtcNow);
 
         if (auditResult.IsFailure)

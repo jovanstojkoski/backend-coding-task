@@ -15,8 +15,6 @@ public sealed class AuditQueue : IAuditQueue
 
     public void Enqueue(IAuditRecord auditRecord)
     {
-        ArgumentNullException.ThrowIfNull(auditRecord);
-
         if (!_queue.Writer.TryWrite(auditRecord))
         {
             throw new InvalidOperationException("The audit queue is not accepting new records.");

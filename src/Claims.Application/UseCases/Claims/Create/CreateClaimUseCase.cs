@@ -58,7 +58,7 @@ internal sealed class CreateClaimUseCase(
 
         var auditResult = ClaimAudit.Create(
             claim.Id,
-            "POST",
+            AuditHttpRequestTypes.Post,
             _dateTimeProvider.UtcNow);
         if (auditResult.IsFailure)
         {

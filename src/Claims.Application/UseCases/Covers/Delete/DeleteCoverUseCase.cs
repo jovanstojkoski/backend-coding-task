@@ -38,7 +38,7 @@ internal sealed class DeleteCoverUseCase(
 
         var auditResult = CoverAudit.Create(
             cover.Id,
-            "DELETE",
+            AuditHttpRequestTypes.Delete,
             _dateTimeProvider.UtcNow);
         if (auditResult.IsFailure)
         {

@@ -5,13 +5,13 @@ namespace Claims.Domain.Auditing;
 
 public class ClaimAudit : IAuditRecord
 {
-    public int Id { get; private set; }
+    public int Id { get; init; }
 
-    public string ClaimId { get; private set; } = null!;
+    public string ClaimId { get; init; } = null!;
 
-    public DateTime Created { get; private set; }
+    public DateTime Created { get; init; }
 
-    public string HttpRequestType { get; private set; } = null!;
+    public string HttpRequestType { get; init; } = null!;
 
     private ClaimAudit()
     {

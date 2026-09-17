@@ -38,7 +38,7 @@ internal sealed class DeleteClaimUseCase(
 
         var auditResult = ClaimAudit.Create(
             claim.Id,
-            "DELETE",
+            AuditHttpRequestTypes.Delete,
             _dateTimeProvider.UtcNow);
         if (auditResult.IsFailure)
         {

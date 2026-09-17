@@ -6,15 +6,15 @@ public class Claim
 {
     public string Id { get; private set; } = null!;
 
-    public string CoverId { get; private set; } = null!;
+    public string CoverId { get; init; } = null!;
 
-    public DateTime Created { get; private set; }
+    public DateTime Created { get; init; }
 
-    public string Name { get; private set; } = null!;
+    public string Name { get; init; } = null!;
 
-    public ClaimType Type { get; private set; }
+    public ClaimType Type { get; init; }
 
-    public decimal DamageCost { get; private set; }
+    public decimal DamageCost { get; init; }
 
     private Claim()
     {

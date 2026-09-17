@@ -10,11 +10,13 @@ public sealed class ClaimTests
     public void Create_AcceptsAClaimInsideTheCoverPeriod()
     {
         var startDate = DateTime.UtcNow.Date.AddDays(1);
+
         var coverResult = Cover.Create(
             startDate,
             startDate.AddDays(30),
             CoverType.Yacht,
             DateTime.UtcNow.Date);
+
         var claimResult = Claim.Create(
             "cover-id",
             startDate.AddDays(10),
@@ -32,11 +34,13 @@ public sealed class ClaimTests
     public void Create_RejectsAClaimOutsideTheCoverPeriod()
     {
         var startDate = DateTime.UtcNow.Date.AddDays(1);
+
         var coverResult = Cover.Create(
             startDate,
             startDate.AddDays(30),
             CoverType.Yacht,
             DateTime.UtcNow.Date);
+
         var claimResult = Claim.Create(
             "cover-id",
             startDate.AddDays(31),

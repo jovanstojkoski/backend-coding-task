@@ -42,7 +42,6 @@ namespace Claims.Infrastructure.Data.Repositories
             var query = _dbSet
                 .AsNoTracking()
                 .OrderByDescending(claim => claim.Created)
-                .ThenBy(claim => claim.Id)
                 .Select(claim => new GetClaimsResponse(
                     claim.Id,
                     claim.CoverId,
