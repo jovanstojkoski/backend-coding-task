@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Claims.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("claims")]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
 public sealed class ClaimsController(ILogger<ClaimsController> logger) : ControllerBase
 {
@@ -86,7 +86,10 @@ public sealed class ClaimsController(ILogger<ClaimsController> logger) : Control
 
         return CreatedAtRoute(
             nameof(GetClaimByIdAsync),
-            new { id = result.Value.Id },
+            new
+            {
+                id = result.Value.Id
+            },
             result.Value);
     }
 

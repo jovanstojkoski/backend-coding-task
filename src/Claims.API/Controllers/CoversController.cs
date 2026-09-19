@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Claims.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("covers")]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
 public sealed class CoversController(ILogger<CoversController> logger) : ControllerBase
 {
@@ -111,7 +111,10 @@ public sealed class CoversController(ILogger<CoversController> logger) : Control
 
         return CreatedAtRoute(
             nameof(GetCoverByIdAsync),
-            new { id = result.Value.Id },
+            new
+            {
+                id = result.Value.Id
+            },
             result.Value);
     }
 

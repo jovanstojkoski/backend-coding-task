@@ -1,24 +1,39 @@
 using System.Threading.Channels;
 using Claims.Application.Abstractions;
 using Claims.Domain.Core.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Claims.Infrastructure.Data.Queues;
 
 public sealed class AuditQueue : IAuditQueue
 {
-    private readonly Channel<IAuditRecord> _queue =
-        Channel.CreateUnbounded<IAuditRecord>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
+    private readonly Channel<IAuditRecord> _queue;
 
-    public void Enqueue(IAuditRecord auditRecord)
+    public AuditQueue(IOptions<AuditQueueOptions> options)
     {
-        if (!_queue.Writer.TryWrite(auditRecord))
+        var capacity = options.Value.Capacity;
+
+        if (capacity <= 0)
         {
-            throw new InvalidOperationException("The audit queue is not accepting new records.");
+            throw new ArgumentOutOfRangeException(
+                nameof(AuditQueueOptions.Capacity),
+                "Audit queue capacity must be greater than zero.");
         }
+
+        _queue = Channel.CreateBounded<IAuditRecord>(
+            new BoundedChannelOptions(capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+            });
+    }
+
+    public ValueTask EnqueueAsync(
+        IAuditRecord auditRecord,
+        CancellationToken cancellationToken)
+    {
+        return _queue.Writer.WriteAsync(auditRecord, cancellationToken);
     }
 
     public IAsyncEnumerable<IAuditRecord> ReadAllAsync(CancellationToken cancellationToken)

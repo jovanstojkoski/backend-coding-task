@@ -1,4 +1,5 @@
 using Claims.Application.Abstractions;
+using Claims.Application.Abstractions.Audit;
 using Claims.Application.Abstractions.Common;
 using Claims.Domain.Auditing;
 using Claims.Domain.Core.Primitives;
@@ -9,13 +10,11 @@ namespace Claims.Application.UseCases.Covers.Delete;
 internal sealed class DeleteCoverUseCase(
     IValidator<DeleteCoverRequest> validator,
     ICoverRepository coverRepository,
-    IClaimsUnitOfWork unitOfWork,
     IAuditQueue auditQueue,
     IDateTimeProvider dateTimeProvider) : IDeleteCoverUseCase
 {
     private readonly IValidator<DeleteCoverRequest> _validator = validator;
     private readonly ICoverRepository _coverRepository = coverRepository;
-    private readonly IClaimsUnitOfWork _unitOfWork = unitOfWork;
     private readonly IAuditQueue _auditQueue = auditQueue;
     private readonly IDateTimeProvider _dateTimeProvider = dateTimeProvider;
 
@@ -30,7 +29,7 @@ internal sealed class DeleteCoverUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        var cover = await _coverRepository.GetByIdForUpdateAsync(request.Id, cancellationToken);
+        var cover = await _coverRepository.GetByIdAsync(request.Id, cancellationToken);
         if (cover is null)
         {
             return Result.Failure<DeleteCoverResponse>("Cover not found.");
@@ -45,10 +44,17 @@ internal sealed class DeleteCoverUseCase(
             return Result.Failure<DeleteCoverResponse>(auditResult.Error);
         }
 
-        _coverRepository.Remove(cover);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var removed = await _coverRepository.RemoveByIdAsync(
+            cover.Id,
+            cancellationToken);
+        if (!removed)
+        {
+            return Result.Failure<DeleteCoverResponse>("Cover not found.");
+        }
 
-        _auditQueue.Enqueue(auditResult.Value);
+        await _auditQueue.EnqueueAsync(
+            auditResult.Value,
+            cancellationToken);
 
         return new DeleteCoverResponse(cover.Id);
     }

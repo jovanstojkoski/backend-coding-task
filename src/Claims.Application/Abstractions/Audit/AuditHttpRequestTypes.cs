@@ -1,4 +1,4 @@
-namespace Claims.Domain.Auditing;
+namespace Claims.Application.Abstractions.Audit;
 
 public static class AuditHttpRequestTypes
 {

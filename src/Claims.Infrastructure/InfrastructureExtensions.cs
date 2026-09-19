@@ -4,10 +4,12 @@ using Claims.Infrastructure.Common;
 using Claims.Infrastructure.Data;
 using Claims.Infrastructure.Data.Queues;
 using Claims.Infrastructure.Data.Repositories;
+using Claims.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System.Runtime.InteropServices;
 using Testcontainers.MongoDb;
@@ -22,6 +24,148 @@ public static class InfrastructureExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        var databaseSettings = await ResolveDatabaseSettingsAsync(
+            configuration,
+            environment);
+
+        services
+            .AddOptions<ConnectionStringsOptions>()
+            .Configure(options => options.AuditDatabase = databaseSettings.AuditConnectionString)
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.AuditDatabase),
+                "The audit database connection string is required.")
+            .ValidateOnStart();
+
+        services
+            .AddOptions<MongoDbOptions>()
+            .Configure(options =>
+            {
+                options.ConnectionString = databaseSettings.MongoConnectionString;
+                options.DatabaseName = databaseSettings.MongoDatabaseName;
+            })
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.ConnectionString),
+                "The MongoDB connection string is required.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.DatabaseName),
+                "The MongoDB database name is required.")
+            .ValidateOnStart();
+
+        services
+            .AddSqlServerDb()
+            .AddMongoDb()
+            .AddInfrastructureHealthChecks()
+            .AddSingleton<IDateTimeProvider, DateTimeProvider>()
+            .AddRepositories()
+            .AddAuditProcessing(configuration);
+
+        return services;
+    }
+
+    public static IServiceCollection AddInfrastructureHealthChecks(
+        this IServiceCollection services)
+    {
+        services
+            .AddHealthChecks()
+            .AddDbContextCheck<AuditContext>("audit-database")
+            .AddDbContextCheck<ClaimsContext>("claims-database");
+
+        return services;
+    }
+
+    public static IServiceCollection AddAuditProcessing(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<AuditQueueOptions>()
+            .Bind(configuration.GetSection(AuditQueueOptions.SectionName))
+            .Validate(
+                options => options.Capacity > 0,
+                "Audit queue capacity must be greater than zero.")
+            .ValidateOnStart();
+
+        return services
+            .AddSingleton<IAuditQueue, AuditQueue>()
+            .AddHostedService<AuditBackgroundService>();
+    }
+
+    public static IServiceCollection AddSqlServerDb(
+        this IServiceCollection services)
+    {
+        services.AddDbContext<AuditContext>((serviceProvider, options) =>
+        {
+            var settings = serviceProvider
+                .GetRequiredService<IOptions<ConnectionStringsOptions>>()
+                .Value;
+
+            options.UseSqlServer(
+                settings.AuditDatabase,
+                sqlOptions => sqlOptions.MigrationsAssembly(
+                    typeof(AuditContext).Assembly.FullName));
+        });
+
+        return services;
+    }
+
+    public static IServiceCollection AddMongoDb(
+        this IServiceCollection services)
+    {
+        services.AddSingleton<IMongoClient>(serviceProvider =>
+        {
+            var settings = serviceProvider
+                .GetRequiredService<IOptions<MongoDbOptions>>()
+                .Value;
+
+            return new MongoClient(settings.ConnectionString);
+        });
+
+        services.AddDbContext<ClaimsContext>((serviceProvider, options) =>
+        {
+            var settings = serviceProvider
+                .GetRequiredService<IOptions<MongoDbOptions>>()
+                .Value;
+            var client = serviceProvider.GetRequiredService<IMongoClient>();
+
+            options.UseMongoDB(client, settings.DatabaseName);
+        });
+
+        services.AddScoped<IClaimsUnitOfWork>(serviceProvider =>
+            serviceProvider.GetRequiredService<ClaimsContext>());
+
+        return services;
+    }
+
+    public static async Task MigrateSqlServerDbAsync(
+        this IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AuditContext>();
+
+        await context.Database.MigrateAsync();
+    }
+
+    public static IServiceCollection AddRepositories(this IServiceCollection services)
+    {
+        services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddScoped<ICoverRepository, CoverRepository>();
+
+        return services;
+    }
+
+    private static async Task<DatabaseSettings> ResolveDatabaseSettingsAsync(
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        var connectionStrings = configuration
+            .GetSection(ConnectionStringsOptions.SectionName)
+            .Get<ConnectionStringsOptions>()
+            ?? new ConnectionStringsOptions();
+        var mongoDb = configuration
+            .GetSection(MongoDbOptions.SectionName)
+            .Get<MongoDbOptions>()
+            ?? new MongoDbOptions();
+
         string auditConnectionString;
         string mongoConnectionString;
 
@@ -46,76 +190,44 @@ public static class InfrastructureExtensions
         }
         else
         {
-            auditConnectionString = configuration.GetConnectionString("AuditDatabase")
-                ?? throw new InvalidOperationException(
-                    "The 'ConnectionStrings:AuditDatabase' configuration value is required outside Development.");
+            auditConnectionString = RequireValue(
+                connectionStrings.AuditDatabase,
+                "ConnectionStrings:AuditDatabase",
+                "outside Development");
 
-            mongoConnectionString = configuration["MongoDb:ConnectionString"]
-                ?? throw new InvalidOperationException(
-                    "The 'MongoDb:ConnectionString' configuration value is required outside Development.");
+            mongoConnectionString = RequireValue(
+                mongoDb.ConnectionString,
+                "MongoDb:ConnectionString",
+                "outside Development");
         }
 
-        var mongoDatabaseName = configuration["MongoDb:DatabaseName"]
-            ?? throw new InvalidOperationException(
-                "The 'MongoDb:DatabaseName' configuration value is required.");
+        var mongoDatabaseName = RequireValue(
+            mongoDb.DatabaseName,
+            "MongoDb:DatabaseName",
+            "in all environments");
 
-        services
-            .AddSqlServerDb(auditConnectionString)
-            .AddMongoDb(mongoConnectionString, mongoDatabaseName)
-            .AddSingleton<IDateTimeProvider, DateTimeProvider>()
-            .AddRepositories()
-            .AddScoped<IClaimsUnitOfWork>(serviceProvider =>
-                serviceProvider.GetRequiredService<ClaimsContext>())
-            .AddSingleton<IAuditQueue, AuditQueue>()
-            .AddHostedService<AuditBackgroundService>();
-
-        return services;
+        return new DatabaseSettings(
+            auditConnectionString,
+            mongoConnectionString,
+            mongoDatabaseName);
     }
 
-    public static IServiceCollection AddSqlServerDb(
-        this IServiceCollection services,
-        string connectionString)
+    private static string RequireValue(
+        string value,
+        string configurationKey,
+        string environmentScope)
     {
-        services.AddDbContext<AuditContext>(options =>
-            options.UseSqlServer(
-                connectionString,
-                sqlOptions => sqlOptions.MigrationsAssembly(
-                    typeof(AuditContext).Assembly.FullName)));
-
-        return services;
-    }
-
-    public static IServiceCollection AddMongoDb(
-        this IServiceCollection services,
-        string connectionString,
-        string databaseName)
-    {
-        services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
-
-        services.AddDbContext<ClaimsContext>((serviceProvider, options) =>
+        if (string.IsNullOrWhiteSpace(value))
         {
-            var client = serviceProvider.GetRequiredService<IMongoClient>();
+            throw new InvalidOperationException(
+                $"The '{configurationKey}' configuration value is required {environmentScope}.");
+        }
 
-            options.UseMongoDB(client, databaseName);
-        });
-
-        return services;
+        return value;
     }
 
-    public static async Task MigrateSqlServerDbAsync(
-        this IServiceProvider services)
-    {
-        await using var scope = services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<AuditContext>();
-
-        await context.Database.MigrateAsync();
-    }
-
-    public static IServiceCollection AddRepositories(this IServiceCollection services)
-    {
-        services.AddScoped<IClaimRepository, ClaimRepository>();
-        services.AddScoped<ICoverRepository, CoverRepository>();
-
-        return services;
-    }
+    private sealed record DatabaseSettings(
+        string AuditConnectionString,
+        string MongoConnectionString,
+        string MongoDatabaseName);
 }

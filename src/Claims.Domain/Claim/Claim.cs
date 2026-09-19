@@ -49,9 +49,10 @@ public class Claim
             return Result.Failure<Claim>("Claim type is invalid.");
         }
 
-        if (damageCost is < 0 or > 100_000m)
+        if (damageCost <= 0 || damageCost > 100_000m)
         {
-            return Result.Failure<Claim>("Damage cost must be between 0 and 100000.");
+            return Result.Failure<Claim>(
+                "Damage cost must be greater than 0 and less than or equal to 100000.");
         }
 
         if (coverEndDate.Date < coverStartDate.Date)

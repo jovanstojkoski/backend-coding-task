@@ -5,15 +5,27 @@ using Claims.Application.UseCases.Covers.GetById;
 using Claims.Domain.Cover;
 using Claims.Infrastructure.Data;
 using Claims.Infrastructure.Data.Extensions;
+using Claims.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace Claims.Infrastructure.Data.Repositories
 {
     internal class CoverRepository : BaseRepository<ClaimsContext, Cover>, ICoverRepository
     {
-        public CoverRepository(ClaimsContext dbContext)
+        private readonly IMongoCollection<BsonDocument> _covers;
+
+        public CoverRepository(
+            ClaimsContext dbContext,
+            IMongoClient mongoClient,
+            IOptions<MongoDbOptions> options)
             : base(dbContext)
         {
+            _covers = mongoClient
+                .GetDatabase(options.Value.DatabaseName)
+                .GetCollection<BsonDocument>("covers");
         }
 
         public async Task<GetCoverResponse?> GetByIdAsync(
@@ -50,14 +62,15 @@ namespace Claims.Infrastructure.Data.Repositories
             return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
         }
 
-        public async Task<Cover?> GetByIdForUpdateAsync(
+        public async Task<bool> RemoveByIdAsync(
             string id,
             CancellationToken cancellationToken)
         {
-            return await _dbSet
-                .SingleOrDefaultAsync(
-                    cover => cover.Id == id,
-                    cancellationToken);
+            var result = await _covers.DeleteOneAsync(
+                new BsonDocument("_id", id),
+                cancellationToken);
+
+            return result.DeletedCount == 1;
         }
     }
 }

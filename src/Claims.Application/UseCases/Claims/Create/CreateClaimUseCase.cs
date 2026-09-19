@@ -1,4 +1,5 @@
 using Claims.Application.Abstractions;
+using Claims.Application.Abstractions.Audit;
 using Claims.Application.Abstractions.Common;
 using Claims.Domain.Auditing;
 using Claims.Domain.Claim;
@@ -67,7 +68,9 @@ internal sealed class CreateClaimUseCase(
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        _auditQueue.Enqueue(auditResult.Value);
+        await _auditQueue.EnqueueAsync(
+            auditResult.Value,
+            cancellationToken);
 
         return new CreateClaimResponse(
             claim.Id,

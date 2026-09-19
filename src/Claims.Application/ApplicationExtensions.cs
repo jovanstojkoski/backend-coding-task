@@ -7,6 +7,7 @@ using Claims.Application.UseCases.Covers.Create;
 using Claims.Application.UseCases.Covers.Delete;
 using Claims.Application.UseCases.Covers.Get;
 using Claims.Application.UseCases.Covers.GetById;
+using Claims.Domain.Cover;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,8 @@ public static class ApplicationExtensions
         services.AddValidatorsFromAssemblyContaining(typeof(ApplicationExtensions),
             ServiceLifetime.Transient,
             includeInternalTypes: true);
+
+        services.AddSingleton<IPremiumCalculator, PremiumCalculator>();
 
         services.AddUseCases();
 
