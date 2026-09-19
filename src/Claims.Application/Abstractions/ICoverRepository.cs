@@ -14,7 +14,7 @@ public interface ICoverRepository
         int pageSize,
         CancellationToken cancellationToken);
 
-    Task<Cover?> GetByIdForUpdateAsync(string id, CancellationToken cancellationToken);
+    Task<bool> RemoveByIdAsync(string id, CancellationToken cancellationToken);
 
     void AddItem(Cover cover);
 

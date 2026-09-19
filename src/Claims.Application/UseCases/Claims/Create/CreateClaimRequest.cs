@@ -31,7 +31,9 @@ internal sealed class CreateClaimRequestValidator : AbstractValidator<CreateClai
             .WithMessage("Claim type is invalid.");
 
         RuleFor(request => request.DamageCost)
-            .InclusiveBetween(0m, 100_000m)
-            .WithMessage("Damage cost must be between 0 and 100000.");
+            .GreaterThan(0m)
+            .WithMessage("Damage cost must be greater than 0.")
+            .LessThanOrEqualTo(100_000m)
+            .WithMessage("Damage cost cannot exceed 100000.");
     }
 }

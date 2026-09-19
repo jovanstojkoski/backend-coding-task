@@ -5,9 +5,11 @@ using FluentValidation;
 namespace Claims.Application.UseCases.Covers.ComputePremium;
 
 internal sealed class ComputePremiumUseCase(
-    IValidator<ComputePremiumRequest> validator) : IComputePremiumUseCase
+    IValidator<ComputePremiumRequest> validator,
+    IPremiumCalculator premiumCalculator) : IComputePremiumUseCase
 {
     private readonly IValidator<ComputePremiumRequest> _validator = validator;
+    private readonly IPremiumCalculator _premiumCalculator = premiumCalculator;
 
     public async Task<Result<decimal>> ExecuteAsync(
         ComputePremiumRequest request,
@@ -20,6 +22,9 @@ internal sealed class ComputePremiumUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        return Cover.ComputePremium(request.StartDate, request.EndDate, request.Type);
+        return _premiumCalculator.Calculate(
+            request.StartDate,
+            request.EndDate,
+            request.Type);
     }
 }

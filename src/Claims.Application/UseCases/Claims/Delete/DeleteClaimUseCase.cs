@@ -1,4 +1,5 @@
 using Claims.Application.Abstractions;
+using Claims.Application.Abstractions.Audit;
 using Claims.Application.Abstractions.Common;
 using Claims.Domain.Auditing;
 using Claims.Domain.Core.Primitives;
@@ -9,13 +10,11 @@ namespace Claims.Application.UseCases.Claims.Delete;
 internal sealed class DeleteClaimUseCase(
     IValidator<DeleteClaimRequest> validator,
     IClaimRepository claimRepository,
-    IClaimsUnitOfWork unitOfWork,
     IAuditQueue auditQueue,
     IDateTimeProvider dateTimeProvider) : IDeleteClaimUseCase
 {
     private readonly IValidator<DeleteClaimRequest> _validator = validator;
     private readonly IClaimRepository _claimRepository = claimRepository;
-    private readonly IClaimsUnitOfWork _unitOfWork = unitOfWork;
     private readonly IAuditQueue _auditQueue = auditQueue;
     private readonly IDateTimeProvider _dateTimeProvider = dateTimeProvider;
 
@@ -30,7 +29,7 @@ internal sealed class DeleteClaimUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        var claim = await _claimRepository.GetByIdForUpdateAsync(request.Id, cancellationToken);
+        var claim = await _claimRepository.GetByIdAsync(request.Id, cancellationToken);
         if (claim is null)
         {
             return Result.Failure<DeleteClaimResponse>("Claim not found.");
@@ -45,10 +44,17 @@ internal sealed class DeleteClaimUseCase(
             return Result.Failure<DeleteClaimResponse>(auditResult.Error);
         }
 
-        _claimRepository.Remove(claim);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var removed = await _claimRepository.RemoveByIdAsync(
+            claim.Id,
+            cancellationToken);
+        if (!removed)
+        {
+            return Result.Failure<DeleteClaimResponse>("Claim not found.");
+        }
 
-        _auditQueue.Enqueue(auditResult.Value);
+        await _auditQueue.EnqueueAsync(
+            auditResult.Value,
+            cancellationToken);
 
         return new DeleteClaimResponse(claim.Id);
     }

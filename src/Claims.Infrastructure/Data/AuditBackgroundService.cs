@@ -18,24 +18,30 @@ public sealed class AuditBackgroundService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var auditRecord in _auditQueue.ReadAllAsync(stoppingToken))
+        try
         {
-            try
+            await foreach (var auditRecord in _auditQueue.ReadAllAsync(stoppingToken))
             {
-                using var scope = _scopeFactory.CreateScope();
-                var auditContext = scope.ServiceProvider.GetRequiredService<AuditContext>();
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var auditContext = scope.ServiceProvider.GetRequiredService<AuditContext>();
 
-                AddAuditRecord(auditContext, auditRecord);
-                await auditContext.SaveChangesAsync(stoppingToken);
+                    AddAuditRecord(auditContext, auditRecord);
+                    await auditContext.SaveChangesAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to persist an audit record.");
+                }
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to persist an audit record.");
-            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
         }
     }
 

@@ -6,15 +6,27 @@ using Claims.Domain.Cover;
 using Claims.Domain.Claim;
 using Claims.Infrastructure.Data;
 using Claims.Infrastructure.Data.Extensions;
+using Claims.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace Claims.Infrastructure.Data.Repositories
 {
     internal class ClaimRepository : BaseRepository<ClaimsContext, Claim>, IClaimRepository
     {
-        public ClaimRepository(ClaimsContext dbContext)
+        private readonly IMongoCollection<BsonDocument> _claims;
+
+        public ClaimRepository(
+            ClaimsContext dbContext,
+            IMongoClient mongoClient,
+            IOptions<MongoDbOptions> options)
             : base(dbContext)
         {
+            _claims = mongoClient
+                .GetDatabase(options.Value.DatabaseName)
+                .GetCollection<BsonDocument>("claims");
         }
 
         public async Task<GetClaimResponse?> GetByIdAsync(
@@ -53,14 +65,15 @@ namespace Claims.Infrastructure.Data.Repositories
             return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
         }
 
-        public async Task<Claim?> GetByIdForUpdateAsync(
+        public async Task<bool> RemoveByIdAsync(
             string id,
             CancellationToken cancellationToken)
         {
-            return await _dbSet
-                .SingleOrDefaultAsync(
-                    claim => claim.Id == id,
-                    cancellationToken);
+            var result = await _claims.DeleteOneAsync(
+                new BsonDocument("_id", id),
+                cancellationToken);
+
+            return result.DeletedCount == 1;
         }
     }
 }
