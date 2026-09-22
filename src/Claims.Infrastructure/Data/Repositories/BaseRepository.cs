@@ -23,5 +23,12 @@ namespace Claims.Infrastructure.Data.Repositories
         {
             _dbSet.Remove(entity);
         }
+
+        public async Task<TEntity?> GetByIdForUpdateAsync(
+            string id,
+            CancellationToken cancellationToken)
+        {
+            return await _dbSet.FindAsync([id], cancellationToken);
+        }
     }
 }

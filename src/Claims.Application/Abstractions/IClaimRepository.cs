@@ -14,9 +14,11 @@ public interface IClaimRepository
         int pageSize,
         CancellationToken cancellationToken);
 
-    Task<bool> RemoveByIdAsync(string id, CancellationToken cancellationToken);
-
     void AddItem(Claim claim);
 
     void Remove(Claim claim);
+
+    Task<Claim?> GetByIdForUpdateAsync(
+        string id,
+        CancellationToken cancellationToken);
 }

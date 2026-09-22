@@ -11,12 +11,14 @@ internal sealed class DeleteClaimUseCase(
     IValidator<DeleteClaimRequest> validator,
     IClaimRepository claimRepository,
     IAuditQueue auditQueue,
-    IDateTimeProvider dateTimeProvider) : IDeleteClaimUseCase
+    IDateTimeProvider dateTimeProvider,
+    IClaimsUnitOfWork claimsUnitOfWork) : IDeleteClaimUseCase
 {
     private readonly IValidator<DeleteClaimRequest> _validator = validator;
     private readonly IClaimRepository _claimRepository = claimRepository;
     private readonly IAuditQueue _auditQueue = auditQueue;
     private readonly IDateTimeProvider _dateTimeProvider = dateTimeProvider;
+    private readonly IClaimsUnitOfWork _claimsUnitOfWork = claimsUnitOfWork;
 
     public async Task<Result<DeleteClaimResponse>> ExecuteAsync(
         DeleteClaimRequest request,
@@ -29,11 +31,14 @@ internal sealed class DeleteClaimUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        var claim = await _claimRepository.GetByIdAsync(request.Id, cancellationToken);
+        var claim = await _claimRepository.GetByIdForUpdateAsync(request.Id, cancellationToken);
         if (claim is null)
         {
             return Result.Failure<DeleteClaimResponse>("Claim not found.");
         }
+
+        _claimRepository.Remove(claim);
+        await _claimsUnitOfWork.SaveChangesAsync(cancellationToken);
 
         var auditResult = ClaimAudit.Create(
             claim.Id,
@@ -42,14 +47,6 @@ internal sealed class DeleteClaimUseCase(
         if (auditResult.IsFailure)
         {
             return Result.Failure<DeleteClaimResponse>(auditResult.Error);
-        }
-
-        var removed = await _claimRepository.RemoveByIdAsync(
-            claim.Id,
-            cancellationToken);
-        if (!removed)
-        {
-            return Result.Failure<DeleteClaimResponse>("Claim not found.");
         }
 
         await _auditQueue.EnqueueAsync(

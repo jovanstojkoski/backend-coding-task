@@ -16,17 +16,12 @@ namespace Claims.Infrastructure.Data.Repositories
 {
     internal class ClaimRepository : BaseRepository<ClaimsContext, Claim>, IClaimRepository
     {
-        private readonly IMongoCollection<BsonDocument> _claims;
-
         public ClaimRepository(
             ClaimsContext dbContext,
             IMongoClient mongoClient,
             IOptions<MongoDbOptions> options)
             : base(dbContext)
         {
-            _claims = mongoClient
-                .GetDatabase(options.Value.DatabaseName)
-                .GetCollection<BsonDocument>("claims");
         }
 
         public async Task<GetClaimResponse?> GetByIdAsync(
@@ -63,17 +58,6 @@ namespace Claims.Infrastructure.Data.Repositories
                     claim.DamageCost));
 
             return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
-        }
-
-        public async Task<bool> RemoveByIdAsync(
-            string id,
-            CancellationToken cancellationToken)
-        {
-            var result = await _claims.DeleteOneAsync(
-                new BsonDocument("_id", id),
-                cancellationToken);
-
-            return result.DeletedCount == 1;
         }
     }
 }

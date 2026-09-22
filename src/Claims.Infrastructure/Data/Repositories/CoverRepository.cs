@@ -15,17 +15,12 @@ namespace Claims.Infrastructure.Data.Repositories
 {
     internal class CoverRepository : BaseRepository<ClaimsContext, Cover>, ICoverRepository
     {
-        private readonly IMongoCollection<BsonDocument> _covers;
-
         public CoverRepository(
             ClaimsContext dbContext,
             IMongoClient mongoClient,
             IOptions<MongoDbOptions> options)
             : base(dbContext)
         {
-            _covers = mongoClient
-                .GetDatabase(options.Value.DatabaseName)
-                .GetCollection<BsonDocument>("covers");
         }
 
         public async Task<GetCoverResponse?> GetByIdAsync(
@@ -60,17 +55,6 @@ namespace Claims.Infrastructure.Data.Repositories
                     cover.Premium));
 
             return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
-        }
-
-        public async Task<bool> RemoveByIdAsync(
-            string id,
-            CancellationToken cancellationToken)
-        {
-            var result = await _covers.DeleteOneAsync(
-                new BsonDocument("_id", id),
-                cancellationToken);
-
-            return result.DeletedCount == 1;
         }
     }
 }

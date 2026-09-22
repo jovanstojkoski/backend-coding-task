@@ -6,11 +6,11 @@ public class Cover
 {
     public string Id { get; private set; } = null!;
 
-    public DateTime StartDate { get; init; }
+    public DateTime StartDate { get; private set; }
 
-    public DateTime EndDate { get; init; }
+    public DateTime EndDate { get; private set; }
 
-    public CoverType Type { get; init; }
+    public CoverType Type { get; private set; }
 
     public decimal Premium { get; private set; }
 
