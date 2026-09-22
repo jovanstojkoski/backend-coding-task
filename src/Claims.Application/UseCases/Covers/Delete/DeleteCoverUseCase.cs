@@ -11,12 +11,14 @@ internal sealed class DeleteCoverUseCase(
     IValidator<DeleteCoverRequest> validator,
     ICoverRepository coverRepository,
     IAuditQueue auditQueue,
-    IDateTimeProvider dateTimeProvider) : IDeleteCoverUseCase
+    IDateTimeProvider dateTimeProvider,
+    IClaimsUnitOfWork claimsUnitOfWork) : IDeleteCoverUseCase
 {
     private readonly IValidator<DeleteCoverRequest> _validator = validator;
     private readonly ICoverRepository _coverRepository = coverRepository;
     private readonly IAuditQueue _auditQueue = auditQueue;
     private readonly IDateTimeProvider _dateTimeProvider = dateTimeProvider;
+    private readonly IClaimsUnitOfWork _claimsUnitOfWork = claimsUnitOfWork;
 
     public async Task<Result<DeleteCoverResponse>> ExecuteAsync(
         DeleteCoverRequest request,
@@ -29,27 +31,23 @@ internal sealed class DeleteCoverUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        var cover = await _coverRepository.GetByIdAsync(request.Id, cancellationToken);
+        var cover = await _coverRepository.GetByIdForUpdateAsync(request.Id, cancellationToken);
         if (cover is null)
         {
             return Result.Failure<DeleteCoverResponse>("Cover not found.");
         }
 
+        _coverRepository.Remove(cover);
+        await _claimsUnitOfWork.SaveChangesAsync(cancellationToken);
+
         var auditResult = CoverAudit.Create(
             cover.Id,
             AuditHttpRequestTypes.Delete,
             _dateTimeProvider.UtcNow);
+
         if (auditResult.IsFailure)
         {
             return Result.Failure<DeleteCoverResponse>(auditResult.Error);
-        }
-
-        var removed = await _coverRepository.RemoveByIdAsync(
-            cover.Id,
-            cancellationToken);
-        if (!removed)
-        {
-            return Result.Failure<DeleteCoverResponse>("Cover not found.");
         }
 
         await _auditQueue.EnqueueAsync(
