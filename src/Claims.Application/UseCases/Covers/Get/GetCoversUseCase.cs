@@ -13,12 +13,18 @@ internal sealed class GetCoversUseCase(
         GetCoversRequest request,
         CancellationToken cancellationToken)
     {
-        var pageNumber = request.PageNumber ?? 1;
-        var pageSize = request.PageSize ?? 10;
+        var paginationResult = Pagination.Create(
+            request.PageNumber,
+            request.PageSize);
+
+        if (paginationResult.IsFailure)
+        {
+            return Result.Failure<PagedResponse<GetCoversResponse>>(
+                paginationResult.Error);
+        }
 
         return await _coverRepository.GetPagedAsync(
-            pageNumber,
-            pageSize,
+            paginationResult.Value,
             cancellationToken);
     }
 }

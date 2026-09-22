@@ -7,22 +7,29 @@ public static class PaginationExtensions
 {
     public static async Task<PagedResponse<T>> ToPagedResultAsync<T>(
         this IQueryable<T> source,
-        int pageNumber,
-        int pageSize,
+        Pagination pagination,
         CancellationToken cancellationToken)
     {
         var count = await source.CountAsync(cancellationToken);
 
         if (count == 0)
         {
-            return new PagedResponse<T>([], 0, pageNumber, pageSize);
+            return new PagedResponse<T>(
+                [],
+                0,
+                pagination.PageNumber,
+                pagination.PageSize);
         }
 
         var items = await source
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
+            .Skip(pagination.Skip)
+            .Take(pagination.Take)
             .ToListAsync(cancellationToken);
 
-        return new PagedResponse<T>(items, count, pageNumber, pageSize);
+        return new PagedResponse<T>(
+            items,
+            count,
+            pagination.PageNumber,
+            pagination.PageSize);
     }
 }

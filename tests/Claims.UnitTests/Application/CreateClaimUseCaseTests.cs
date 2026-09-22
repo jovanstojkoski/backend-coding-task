@@ -79,7 +79,7 @@ public sealed class CreateClaimUseCaseTests
         Assert.That(result.IsFailure, Is.True);
 
         _coverRepository.Verify(
-            repository => repository.GetByIdAsync(
+            repository => repository.GetByIdForUpdateAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);

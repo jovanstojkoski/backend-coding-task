@@ -13,12 +13,18 @@ internal sealed class GetClaimsUseCase(
         GetClaimsRequest request,
         CancellationToken cancellationToken)
     {
-        var pageNumber = request.PageNumber ?? 1;
-        var pageSize = request.PageSize ?? 10;
+        var paginationResult = Pagination.Create(
+            request.PageNumber,
+            request.PageSize);
+
+        if (paginationResult.IsFailure)
+        {
+            return Result.Failure<PagedResponse<GetClaimsResponse>>(
+                paginationResult.Error);
+        }
 
         return await _claimRepository.GetPagedAsync(
-            pageNumber,
-            pageSize,
+            paginationResult.Value,
             cancellationToken);
     }
 }

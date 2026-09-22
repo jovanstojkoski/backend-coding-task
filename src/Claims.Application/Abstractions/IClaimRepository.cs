@@ -7,14 +7,21 @@ namespace Claims.Application.Abstractions;
 
 public interface IClaimRepository
 {
-    Task<GetClaimResponse?> GetByIdAsync(string id, CancellationToken cancellationToken);
-
     Task<PagedResponse<GetClaimsResponse>> GetPagedAsync(
-        int pageNumber,
-        int pageSize,
+        Pagination pagination,
         CancellationToken cancellationToken);
 
-    Task<bool> RemoveByIdAsync(string id, CancellationToken cancellationToken);
+    Task<bool> HasAnyForCoverAsync(
+        string coverId,
+        CancellationToken cancellationToken);
+
+    Task<GetClaimResponse?> GetByIdAsync(
+        string id,
+        CancellationToken cancellationToken);
+
+    Task<Claim?> GetByIdForUpdateAsync(
+        string id,
+        CancellationToken cancellationToken);
 
     void AddItem(Claim claim);
 

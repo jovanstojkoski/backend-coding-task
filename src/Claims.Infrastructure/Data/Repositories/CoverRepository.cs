@@ -5,27 +5,15 @@ using Claims.Application.UseCases.Covers.GetById;
 using Claims.Domain.Cover;
 using Claims.Infrastructure.Data;
 using Claims.Infrastructure.Data.Extensions;
-using Claims.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Driver;
 
 namespace Claims.Infrastructure.Data.Repositories
 {
     internal class CoverRepository : BaseRepository<ClaimsContext, Cover>, ICoverRepository
     {
-        private readonly IMongoCollection<BsonDocument> _covers;
-
-        public CoverRepository(
-            ClaimsContext dbContext,
-            IMongoClient mongoClient,
-            IOptions<MongoDbOptions> options)
+        public CoverRepository(ClaimsContext dbContext)
             : base(dbContext)
         {
-            _covers = mongoClient
-                .GetDatabase(options.Value.DatabaseName)
-                .GetCollection<BsonDocument>("covers");
         }
 
         public async Task<GetCoverResponse?> GetByIdAsync(
@@ -45,13 +33,13 @@ namespace Claims.Infrastructure.Data.Repositories
         }
 
         public async Task<PagedResponse<GetCoversResponse>> GetPagedAsync(
-            int pageNumber,
-            int pageSize,
+            Pagination pagination,
             CancellationToken cancellationToken)
         {
             var query = _dbSet
                 .AsNoTracking()
                 .OrderByDescending(cover => cover.StartDate)
+                .ThenBy(cover => cover.Id)
                 .Select(cover => new GetCoversResponse(
                     cover.Id,
                     cover.StartDate,
@@ -59,18 +47,7 @@ namespace Claims.Infrastructure.Data.Repositories
                     cover.Type,
                     cover.Premium));
 
-            return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
-        }
-
-        public async Task<bool> RemoveByIdAsync(
-            string id,
-            CancellationToken cancellationToken)
-        {
-            var result = await _covers.DeleteOneAsync(
-                new BsonDocument("_id", id),
-                cancellationToken);
-
-            return result.DeletedCount == 1;
+            return await query.ToPagedResultAsync(pagination, cancellationToken);
         }
     }
 }

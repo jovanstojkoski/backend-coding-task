@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Claims.Application.Abstractions.Common.Models;
+using Claims.Application.UseCases.Claims.Get;
 using Claims.Domain.Claim;
 using Claims.Domain.Cover;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +9,7 @@ using NUnit.Framework;
 
 namespace Claims.IntegrationTests.Api;
 
-public sealed class ClaimsControllerTests
+public sealed class ClaimsControllerTests : ApiIntegrationTestBase
 {
     private const string ControllerRoute = "/claims";
     private const string CoversRoute = "/covers";
@@ -77,6 +79,23 @@ public sealed class ClaimsControllerTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(body, Does.Contain(createdClaim.Id));
+    }
+
+    [Test]
+    public async Task GetAll_ReturnsBadRequestForInvalidPagination()
+    {
+        using var client = IntegrationTestFixture.Application.CreateClient();
+
+        var response = await client.GetAsync(
+            $"{ControllerRoute}?pageNumber=1&pageSize=0",
+            CancellationToken.None);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(
+            CancellationToken.None);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(problem, Is.Not.Null);
+        Assert.That(problem!.Title, Is.EqualTo("Claims Retrieval Error"));
     }
 
     [Test]

@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
+using Claims.Application.Abstractions.Common.Models;
+using Claims.Application.UseCases.Covers.Get;
 using Claims.Domain.Cover;
 using Microsoft.AspNetCore.Mvc;
 using NUnit.Framework;
 
 namespace Claims.IntegrationTests.Api;
 
-public sealed class CoversControllerTests
+public sealed class CoversControllerTests : ApiIntegrationTestBase
 {
     private const string ControllerRoute = "/covers";
 
@@ -110,6 +112,23 @@ public sealed class CoversControllerTests
     }
 
     [Test]
+    public async Task GetAll_ReturnsBadRequestForInvalidPagination()
+    {
+        using var client = IntegrationTestFixture.Application.CreateClient();
+
+        var response = await client.GetAsync(
+            $"{ControllerRoute}?pageNumber=0&pageSize=10",
+            CancellationToken.None);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(
+            CancellationToken.None);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(problem, Is.Not.Null);
+        Assert.That(problem!.Title, Is.EqualTo("Covers Retrieval Error"));
+    }
+
+    [Test]
     public async Task GetById_ReturnsExistingCover()
     {
         using var client = IntegrationTestFixture.Application.CreateClient();
@@ -159,7 +178,7 @@ public sealed class CoversControllerTests
     }
 
     [Test]
-    public async Task Delete_ReturnsNotFoundForMissingCover()
+    public async Task Delete_ReturnsBadRequestForMissingCover()
     {
         using var client = IntegrationTestFixture.Application.CreateClient();
 
@@ -167,7 +186,41 @@ public sealed class CoversControllerTests
             $"{ControllerRoute}/missing-cover-id",
             CancellationToken.None);
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task Delete_ReturnsBadRequestWhenCoverHasClaims()
+    {
+        using var client = IntegrationTestFixture.Application.CreateClient();
+        var cover = await CreateCoverAsync(client);
+        var startDate = IntegrationTestFixture.CurrentDate.AddDays(1);
+
+        var claimResponse = await client.PostAsJsonAsync(
+            "/claims",
+            new
+            {
+                coverId = cover.Id,
+                created = startDate.AddDays(10),
+                name = "Collision damage",
+                type = Claims.Domain.Claim.ClaimType.Collision,
+                damageCost = 10_000m
+            },
+            IntegrationTestFixture.JsonOptions,
+            CancellationToken.None);
+
+        Assert.That(claimResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+
+        var response = await client.DeleteAsync(
+            $"{ControllerRoute}/{cover.Id}",
+            CancellationToken.None);
+
+        var getResponse = await client.GetAsync(
+            $"{ControllerRoute}/{cover.Id}",
+            CancellationToken.None);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(getResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     private static object CreateCoverRequest()

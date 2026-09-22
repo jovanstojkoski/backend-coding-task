@@ -1,10 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Runtime.CompilerServices;
+using Claims.Application.Abstractions;
 using Claims.Application.Abstractions.Common;
+using Claims.Domain.Core.Abstractions;
+using Claims.Infrastructure.Options;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using NUnit.Framework;
 
 namespace Claims.IntegrationTests.Api;
@@ -34,6 +41,9 @@ public sealed class IntegrationTestFixture
                     services.RemoveAll<IDateTimeProvider>();
                     services.AddSingleton<IDateTimeProvider>(
                         new FixedDateTimeProvider(CurrentDate));
+
+                    services.RemoveAll<IAuditQueue>();
+                    services.AddSingleton<IAuditQueue, NoOpAuditQueue>();
                 });
             });
     }
@@ -44,8 +54,48 @@ public sealed class IntegrationTestFixture
         Application.Dispose();
     }
 
+    public static async Task ResetDatabaseAsync()
+    {
+        using var client = Application.CreateClient();
+        await using var scope = Application.Services.CreateAsyncScope();
+
+        var settings = scope.ServiceProvider
+            .GetRequiredService<IOptions<MongoDbOptions>>()
+            .Value;
+
+        var mongoClient = scope.ServiceProvider
+            .GetRequiredService<IMongoClient>();
+
+        var database = mongoClient.GetDatabase(settings.DatabaseName);
+
+        await database
+            .GetCollection<BsonDocument>("claims")
+            .DeleteManyAsync(FilterDefinition<BsonDocument>.Empty);
+
+        await database
+            .GetCollection<BsonDocument>("covers")
+            .DeleteManyAsync(FilterDefinition<BsonDocument>.Empty);
+    }
+
     private sealed class FixedDateTimeProvider(DateTime utcNow) : IDateTimeProvider
     {
         public DateTime UtcNow { get; } = utcNow;
+    }
+
+    public sealed class NoOpAuditQueue : IAuditQueue
+    {
+        public ValueTask EnqueueAsync(
+            IAuditRecord auditRecord,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<IAuditRecord> ReadAllAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            yield break;
+        }
     }
 }

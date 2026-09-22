@@ -123,7 +123,7 @@ public sealed class CoversController(ILogger<CoversController> logger) : Control
     /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteAsync(
         [FromRoute] string id,
         [FromServices] IDeleteCoverUseCase useCase,
@@ -134,7 +134,7 @@ public sealed class CoversController(ILogger<CoversController> logger) : Control
         {
             _logger.LogWarning("Failed to delete cover {CoverId}: {Error}", id, result.Error);
             return Problem(
-                statusCode: StatusCodes.Status404NotFound,
+                statusCode: StatusCodes.Status400BadRequest,
                 detail: result.Error,
                 title: "Cover Deletion Error");
         }

@@ -2,31 +2,18 @@
 using Claims.Application.Abstractions.Common.Models;
 using Claims.Application.UseCases.Claims.Get;
 using Claims.Application.UseCases.Claims.GetById;
-using Claims.Domain.Cover;
 using Claims.Domain.Claim;
 using Claims.Infrastructure.Data;
 using Claims.Infrastructure.Data.Extensions;
-using Claims.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Driver;
 
 namespace Claims.Infrastructure.Data.Repositories
 {
     internal class ClaimRepository : BaseRepository<ClaimsContext, Claim>, IClaimRepository
     {
-        private readonly IMongoCollection<BsonDocument> _claims;
-
-        public ClaimRepository(
-            ClaimsContext dbContext,
-            IMongoClient mongoClient,
-            IOptions<MongoDbOptions> options)
+        public ClaimRepository(ClaimsContext dbContext)
             : base(dbContext)
         {
-            _claims = mongoClient
-                .GetDatabase(options.Value.DatabaseName)
-                .GetCollection<BsonDocument>("claims");
         }
 
         public async Task<GetClaimResponse?> GetByIdAsync(
@@ -47,13 +34,13 @@ namespace Claims.Infrastructure.Data.Repositories
         }
 
         public async Task<PagedResponse<GetClaimsResponse>> GetPagedAsync(
-            int pageNumber,
-            int pageSize,
+            Pagination pagination,
             CancellationToken cancellationToken)
         {
             var query = _dbSet
                 .AsNoTracking()
                 .OrderByDescending(claim => claim.Created)
+                .ThenBy(claim => claim.Id)
                 .Select(claim => new GetClaimsResponse(
                     claim.Id,
                     claim.CoverId,
@@ -62,18 +49,19 @@ namespace Claims.Infrastructure.Data.Repositories
                     claim.Type,
                     claim.DamageCost));
 
-            return await query.ToPagedResultAsync(pageNumber, pageSize, cancellationToken);
+            return await query.ToPagedResultAsync(pagination, cancellationToken);
         }
 
-        public async Task<bool> RemoveByIdAsync(
-            string id,
+        public async Task<bool> HasAnyForCoverAsync(
+            string coverId,
             CancellationToken cancellationToken)
         {
-            var result = await _claims.DeleteOneAsync(
-                new BsonDocument("_id", id),
-                cancellationToken);
-
-            return result.DeletedCount == 1;
+            return await _dbSet
+                .AsNoTracking()
+                .AnyAsync(
+                    claim => claim.CoverId == coverId,
+                    cancellationToken);
         }
+
     }
 }

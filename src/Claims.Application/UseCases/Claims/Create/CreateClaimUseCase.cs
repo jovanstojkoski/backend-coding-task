@@ -34,7 +34,9 @@ internal sealed class CreateClaimUseCase(
                 string.Join(Environment.NewLine, validationResult.Errors.Select(error => error.ErrorMessage)));
         }
 
-        var cover = await _coverRepository.GetByIdAsync(request.CoverId, cancellationToken);
+        var cover = await _coverRepository.GetByIdAsync(
+            request.CoverId,
+            cancellationToken);
         if (cover is null)
         {
             return Result.Failure<CreateClaimResponse>("Cover not found.");

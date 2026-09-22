@@ -1,8 +1,8 @@
 using Claims.Application.Abstractions;
 using Claims.Application.Abstractions.Common;
 using Claims.Application.UseCases.Claims.Delete;
-using Claims.Application.UseCases.Claims.GetById;
 using Claims.Domain.Auditing;
+using Claims.Domain.Claim;
 using Claims.Domain.Core.Abstractions;
 using Moq;
 using NUnit.Framework;
@@ -12,6 +12,7 @@ namespace Claims.UnitTests.Application;
 public sealed class DeleteClaimUseCaseTests
 {
     private Mock<IClaimRepository> _claimRepository = null!;
+    private Mock<IClaimsUnitOfWork> _unitOfWork = null!;
     private Mock<IAuditQueue> _auditQueue = null!;
     private Mock<IDateTimeProvider> _dateTimeProvider = null!;
 
@@ -19,6 +20,7 @@ public sealed class DeleteClaimUseCaseTests
     public void SetUp()
     {
         _claimRepository = new Mock<IClaimRepository>();
+        _unitOfWork = new Mock<IClaimsUnitOfWork>();
         _auditQueue = new Mock<IAuditQueue>();
         _dateTimeProvider = new Mock<IDateTimeProvider>();
 
@@ -37,7 +39,7 @@ public sealed class DeleteClaimUseCaseTests
         Assert.That(result.IsFailure, Is.True);
 
         _claimRepository.Verify(
-            repository => repository.GetByIdAsync(
+            repository => repository.GetByIdForUpdateAsync(
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
@@ -47,10 +49,10 @@ public sealed class DeleteClaimUseCaseTests
     public async Task ExecuteAsync_WhenClaimDoesNotExist_ReturnsFailureWithoutSaving()
     {
         _claimRepository
-            .Setup(repository => repository.GetByIdAsync(
+            .Setup(repository => repository.GetByIdForUpdateAsync(
                 "missing-claim",
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((GetClaimResponse?)null);
+            .ReturnsAsync((Claim?)null);
 
         var result = await CreateSut().ExecuteAsync(
             new DeleteClaimRequest("missing-claim"),
@@ -64,28 +66,27 @@ public sealed class DeleteClaimUseCaseTests
                 It.IsAny<IAuditRecord>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+        _unitOfWork.Verify(
+            unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Test]
     public async Task ExecuteAsync_WhenClaimExists_RemovesAndQueuesAudit()
     {
         _claimRepository
-            .Setup(repository => repository.GetByIdAsync(
+            .Setup(repository => repository.GetByIdForUpdateAsync(
                 "claim-id",
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GetClaimResponse(
-                "claim-id",
-                "cover-id",
-                new DateTime(2026, 1, 1),
-                "Collision damage",
-                 Claims.Domain.Claim.ClaimType.Collision,
-                 10_000m));
+            .ReturnsAsync(CreateClaim("claim-id"));
 
         _claimRepository
-            .Setup(repository => repository.RemoveByIdAsync(
-                "claim-id",
+            .Setup(repository => repository.Remove(It.IsAny<Claim>()));
+
+        _unitOfWork
+            .Setup(unitOfWork => unitOfWork.SaveChangesAsync(
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ReturnsAsync(1);
 
         _auditQueue
             .Setup(queue => queue.EnqueueAsync(
@@ -101,10 +102,14 @@ public sealed class DeleteClaimUseCaseTests
         Assert.That(result.Value.Id, Is.EqualTo("claim-id"));
 
         _claimRepository.Verify(
-            repository => repository.RemoveByIdAsync(
-                "claim-id",
-                It.IsAny<CancellationToken>()),
+            repository => repository.Remove(
+                It.Is<Claim>(claim => claim.Id == "claim-id")),
             Times.Once);
+
+        _unitOfWork.Verify(
+            unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+
         _auditQueue.Verify(
             queue => queue.EnqueueAsync(
                 It.Is<ClaimAudit>(audit => audit.ClaimId == "claim-id"),
@@ -117,7 +122,27 @@ public sealed class DeleteClaimUseCaseTests
         return new DeleteClaimUseCase(
             new DeleteClaimRequestValidator(),
             _claimRepository.Object,
+            _unitOfWork.Object,
             _auditQueue.Object,
             _dateTimeProvider.Object);
+    }
+
+    private static Claim CreateClaim(string id)
+    {
+        var result = Claim.Create(
+            "cover-id",
+            new DateTime(2026, 1, 1),
+            "Collision damage",
+            ClaimType.Collision,
+            10_000m,
+            new DateTime(2026, 1, 1),
+            new DateTime(2026, 1, 31));
+
+        var claim = result.Value;
+        typeof(Claim)
+            .GetProperty(nameof(Claim.Id))!
+            .SetValue(claim, id);
+
+        return claim;
     }
 }
